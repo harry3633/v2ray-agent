@@ -699,18 +699,22 @@ handleNginx() {
 # 定时任务更新tls证书
 installCronTLS() {
 	echoContent skyBlue "\n进度  $1/${totalProgress} : 添加定时维护证书"
-	if crontab -l | grep -v grep | grep -q '/etc/v2ray-agent/install.sh'; then
+	if ! crontab -l | grep -v grep | grep -q '/etc/v2ray-agent/install.sh'; then
 		crontab -l >/etc/v2ray-agent/backup_crontab.cron
 		if grep </etc/v2ray-agent/backup_crontab.cron -q /etc/v2ray-agent/reloadInstallTLS.sh; then
 			sed -i "s/30 1 \\* \\* \\* \\/bin\\/bash \\/etc\\/v2ray-agent\\/reloadInstallTLS.sh//g" $(grep "30 1 \* \* \* /bin/bash /etc/v2ray-agent/reloadInstallTLS.sh" -rl /etc/v2ray-agent/backup_crontab.cron)
 		fi
-
 		# 定时任务
 		echo "30 1 * * * /bin/bash /etc/v2ray-agent/install.sh RenewTLS" >>/etc/v2ray-agent/backup_crontab.cron
 		crontab /etc/v2ray-agent/backup_crontab.cron
 	fi
 
 	if [[ -n $(crontab -l | grep -v grep | grep '/etc/v2ray-agent/install.sh') ]]; then
+
+		crontab -l | uniq | awk '/./ {print}' >>/etc/v2ray-agent/backup_crontab.cron
+		local crontabResult=$(cat /etc/v2ray-agent/backup_crontab.cron | uniq | awk '/./ {print}')
+		echo "${crontabResult}" >/etc/v2ray-agent/backup_crontab.cron
+		crontab /etc/v2ray-agent/backup_crontab.cron
 		echoContent green " ---> 添加定时维护证书成功"
 	else
 		echo "30 1 * * * /bin/bash /etc/v2ray-agent/install.sh RenewTLS" >>/etc/v2ray-agent/backup_crontab.cron
@@ -829,7 +833,7 @@ installXray() {
 	echoContent skyBlue "\n进度  $1/${totalProgress} : 安装Xray"
 
 	if [[ "${coreInstallType}" != "1" ]]; then
-		version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
+		version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ |grep "Xray-core v" | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
 
 		echoContent green " ---> Xray-core版本:${version}"
 		if wget --help | grep -q show-progress; then
@@ -892,7 +896,7 @@ v2rayVersionManageMenu() {
 	if [[ "${selectV2RayType}" == "1" ]]; then
 		updateV2Ray
 	elif [[ "${selectV2RayType}" == "2" ]]; then
-		echoContent yellow "\n1.只可以回退最近的两个版本"
+		echoContent yellow "\n1.只可以回退最近的五个版本"
 		echoContent yellow "2.不保证回退后一定可以正常使用"
 		echoContent yellow "3.如果回退的版本不支持当前的config，则会无法连接，谨慎操作"
 		echoContent skyBlue "------------------------Version-------------------------------"
@@ -925,14 +929,14 @@ xrayVersionManageMenu() {
 	if [[ "${selectXrayType}" == "1" ]]; then
 		updateXray
 	elif [[ "${selectXrayType}" == "2" ]]; then
-		echoContent yellow "\n1.由于Xray-core频繁更新，只可以回退最近的一个版本"
+		echoContent yellow "\n1.由于Xray-core频繁更新，只可以回退最近的两个版本"
 		echoContent yellow "2.不保证回退后一定可以正常使用"
 		echoContent yellow "3.如果回退的版本不支持当前的config，则会无法连接，谨慎操作"
 		echoContent skyBlue "------------------------Version-------------------------------"
-		curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ | head -3 | awk '{print $3}' | awk -F "[<]" '{print $1}' | tail -n 1 | awk '{print ""NR""":"$0}'
+		curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ |grep "Xray-core v" | head -5 | awk -F "[X][r][a][y][-][c][o][r][e][ ]" '{print $2}' | awk -F "[<]" '{print $1}' | tail -n 5 | awk '{print ""NR""":"$0}'
 		echoContent skyBlue "--------------------------------------------------------------"
 		read -r -p "请输入要回退的版本：" selectXrayVersionType
-		version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ | head -3 | awk '{print $3}' | awk -F "[<]" '{print $1}' | tail -n 1 | awk '{print ""NR""":"$0}' | grep "${selectXrayVersionType}:" | awk -F "[:]" '{print $2}')
+		version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ |grep "Xray-core v" | head -5 | awk -F "[X][r][a][y][-][c][o][r][e][ ]" '{print $2}' | awk -F "[<]" '{print $1}' | tail -n 5 | awk '{print ""NR""":"$0}' | grep "${selectXrayVersionType}:" | awk -F "[:]" '{print $2}')
 		if [[ -n "${version}" ]]; then
 			updateXray "${version}"
 		else
@@ -1027,7 +1031,7 @@ updateXray() {
 		if [[ -n "$1" ]]; then
 			version=$1
 		else
-			version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
+			version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ |grep "Xray-core v" | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
 		fi
 
 		echoContent green " ---> Xray-core版本:${version}"
@@ -1049,7 +1053,7 @@ updateXray() {
 		if [[ -n "$1" ]]; then
 			version=$1
 		else
-			version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
+			version=$(curl -s https://github.com/XTLS/Xray-core/releases | grep /XTLS/Xray-core/releases/tag/ |grep "Xray-core v" | head -1 | awk '{print $3}' | awk -F "[<]" '{print $1}')
 		fi
 
 		if [[ -n "$1" ]]; then
@@ -2555,16 +2559,27 @@ removeUser() {
 # 更新脚本
 updateV2RayAgent() {
 	echoContent skyBlue "\n进度  $1/${totalProgress} : 更新v2ray-agent脚本"
-	wget -P /etc/v2ray-agent/ -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh" && chmod 700 /etc/v2ray-agent/install.sh
-	echoContent skyBlue " ---> 更新完毕，请手动执行[vasma]打开脚本\n"
+	if wget --help | grep -q show-progress; then
+		wget -c -q --show-progress -P /etc/v2ray-agent/ -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh"
+	else
+		wget -c -q -P /etc/v2ray-agent/ -N --no-check-certificate "https://raw.githubusercontent.com/mack-a/v2ray-agent/master/install.sh"
+	fi
+
+	sudo chmod 700 /etc/v2ray-agent/install.sh
+	local version=$(cat /etc/v2ray-agent/install.sh | grep '当前版本：v' | awk -F "[v]" '{print $2}' | tail -n +2 | head -n 1 | awk -F "[\"]" '{print $1}')
+
+	echoContent green "\n ---> 更新完毕"
+	echoContent yellow " ---> 请手动执行[vasma]打开脚本"
+	echoContent green " ---> 当前版本:${version}\n"
+	exit 0
 }
 
 # 安装BBR
 bbrInstall() {
 	echoContent red "\n=============================================================="
 	echoContent green "BBR脚本用的[ylx2016]的成熟作品，地址[https://github.com/ylx2016/Linux-NetSpeed]，请熟知"
-	echoContent red "   1.安装【推荐原版BBR+FQ】"
-	echoContent red "   2.回退主目录"
+	echoContent yellow "1.安装【推荐原版BBR+FQ】"
+	echoContent yellow "2.回退主目录"
 	echoContent red "=============================================================="
 	read -r -p "请选择：" installBBRStatus
 	if [[ "${installBBRStatus}" == "1" ]]; then
@@ -3098,7 +3113,7 @@ menu() {
 	cd "$HOME" || exit
 	echoContent red "\n=============================================================="
 	echoContent green "作者：mack-a"
-	echoContent green "当前版本：v2.3.11"
+	echoContent green "当前版本：v2.3.16"
 	echoContent green "Github：https://github.com/mack-a/v2ray-agent"
 	echoContent green "描述：七合一共存脚本"
 	echoContent red "=============================================================="
@@ -3114,7 +3129,7 @@ menu() {
 	echoContent yellow "8.core版本管理"
 	echoContent yellow "9.更新Trojan-Go"
 	echoContent yellow "10.更新脚本"
-	echoContent yellow "11.安装BBR"
+	echoContent yellow "11.安装BBR、DD脚本"
 	echoContent skyBlue "-------------------------脚本管理-----------------------------"
 	echoContent yellow "12.查看日志"
 	echoContent yellow "13.卸载脚本"
